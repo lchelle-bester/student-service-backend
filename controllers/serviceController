@@ -1,0 +1,130 @@
+// controllers/serviceController.js
+const db = require('../db');
+
+const serviceController = {
+    // Log new service hours
+    async logServiceHours(req, res) {
+        // Start a database transaction to ensure data consistency
+        const client = await db.pool.connect();
+        
+        try {
+            await client.query('BEGIN'); // Start transaction
+
+            const {
+                studentId,
+                hours,
+                serviceType,  // 'school' or 'community'
+                description,
+                dateCompleted,
+                assignedBy,    // teacherId or organizationId
+                assignerType   // 'teacher' or 'organization'
+            } = req.body;
+
+            // First, verify the student exists
+            const studentCheck = await client.query(
+                'SELECT id FROM users WHERE student_id = $1 AND user_type = $2',
+                [studentId, 'student']
+            );
+
+            if (studentCheck.rows.length === 0) {
+                throw new Error('Student not found');
+            }
+
+            // Log the service record
+            const insertRecord = await client.query(
+                `INSERT INTO service_records (
+                    student_id,
+                    hours,
+                    service_type,
+                    description,
+                    date_completed,
+                    assigned_by,
+                    organization_id,
+                    created_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+                RETURNING id`,
+                [
+                    studentCheck.rows[0].id,
+                    hours,
+                    serviceType,
+                    description,
+                    dateCompleted,
+                    assignerType === 'teacher' ? assignedBy : null,
+                    assignerType === 'organization' ? assignedBy : null,
+                    new Date()
+                ]
+            );
+
+            // Update the student's total hours
+            await client.query(
+                `UPDATE users 
+                SET total_hours = total_hours + $1
+                WHERE id = $2`,
+                [hours, studentCheck.rows[0].id]
+            );
+
+            await client.query('COMMIT'); // Commit transaction
+
+            res.json({
+                success: true,
+                message: 'Service hours logged successfully',
+                recordId: insertRecord.rows[0].id
+            });
+
+        } catch (error) {
+            await client.query('ROLLBACK'); // Rollback on error
+            console.error('Error logging service hours:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to log service hours',
+                error: error.message
+            });
+        } finally {
+            client.release(); // Release the database client
+        }
+    },
+
+    // Get service hours for a specific student
+    async getStudentHours(req, res) {
+        try {
+            const { studentId } = req.params;
+
+            const records = await db.query(
+                `SELECT 
+                    sr.id,
+                    sr.hours,
+                    sr.service_type,
+                    sr.description,
+                    sr.date_completed,
+                    CASE 
+                        WHEN sr.assigned_by IS NOT NULL THEN t.full_name
+                        WHEN sr.organization_id IS NOT NULL THEN o.name
+                    END as assigned_by_name,
+                    sr.created_at
+                FROM service_records sr
+                LEFT JOIN users t ON sr.assigned_by = t.id
+                LEFT JOIN organizations o ON sr.organization_id = o.id
+                WHERE sr.student_id = (
+                    SELECT id FROM users WHERE student_id = $1
+                )
+                ORDER BY sr.date_completed DESC`,
+                [studentId]
+            );
+
+            res.json({
+                success: true,
+                records: records.rows
+            });
+
+        } catch (error) {
+            console.error('Error fetching student hours:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to fetch service hours',
+                error: error.message
+            });
+        }
+    }
+};
+
+module.exports = serviceController;
