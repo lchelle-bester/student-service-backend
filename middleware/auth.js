@@ -1,5 +1,7 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
+// Change this line at the top
+const bcrypt = require('bcryptjs');  // instead of require('bcrypt')
 
 const authMiddleware = {
     // Verify that the request has a valid JWT token
