@@ -1,6 +1,7 @@
 // backend/routes/auth.js
-const router = require('express').Router();  // Add this line at the top
-const bcrypt = require('bcrypt');
+// routes/auth.js
+const router = require('express').Router();
+const bcrypt = require('bcryptjs');  // Changed from 'bcrypt' to 'bcryptjs'
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 

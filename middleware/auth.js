@@ -1,7 +1,5 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
-// Change this line at the top
-const bcrypt = require('bcryptjs');  // instead of require('bcrypt')
 
 const authMiddleware = {
     // Verify that the request has a valid JWT token
@@ -18,6 +16,7 @@ const authMiddleware = {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             console.log('Decoded token:', decoded);
             req.user = decoded;
+
             next();
         } catch (error) {
             console.error('Token verification error:', error);
