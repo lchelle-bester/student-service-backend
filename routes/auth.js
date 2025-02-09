@@ -7,28 +7,36 @@ const db = require('../config/db');
 router.post('/login/student', async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log('Login attempt received:', { email, password });
+        console.log('Received login attempt for:', email);
 
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1 AND user_type = $2',
             [email.toLowerCase(), 'student']
         );
-        console.log('Database query result count:', result.rows.length);
 
         if (result.rows.length === 0) {
-            console.log('No user found with email:', email);
             return res.status(401).json({ message: 'Invalid credentials (user not found)' });
         }
 
         const student = result.rows[0];
-        console.log('Found user:', {
-            id: student.id,
-            email: student.email,
-            hasPasswordHash: !!student.password_hash
-        });
+        console.log('Stored password hash:', student.password_hash);
+        console.log('Attempting to compare with password:', password);
 
+        // Let's also test bcrypt directly
+        const testHash = await bcrypt.hash('password123', 10);
+        console.log('Test hash generated:', testHash);
+        const testCompare = await bcrypt.compare('password123', testHash);
+        console.log('Test comparison result:', testCompare);
+
+        // Now try the actual comparison
         const validPassword = await bcrypt.compare(password, student.password_hash);
-        console.log('Password validation result:', validPassword);
+        console.log('Actual comparison result:', validPassword);
+
+        if (!validPassword) {
+            return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
+        }
+
+        // ... rest of the code
 
         if (!validPassword) {
             console.log('Password validation failed');
