@@ -1,24 +1,13 @@
-// backend/routes/auth.js
-// routes/auth.js
 const router = require('express').Router();
-const bcrypt = require('bcryptjs');  // Changed from 'bcrypt' to 'bcryptjs'
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
+// Student Login
 router.post('/login/student', async (req, res) => {
     try {
-        console.log('Raw request body:', req.body);
-        console.log('Headers:', req.headers);
-
-        if (!req.body) {
-            return res.status(400).json({ message: 'Request body is missing' });
-        }
-
         const { email, password } = req.body;
-        
-        if (!email) {
-            return res.status(400).json({ message: 'Email is required', receivedBody: req.body });
-        }
+        console.log('Attempting student login for:', email);
 
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1 AND user_type = $2',
@@ -40,7 +29,7 @@ router.post('/login/student', async (req, res) => {
             { 
                 id: student.id, 
                 type: 'student',
-                studentId: student.student_id 
+                email: student.email 
             },
             process.env.JWT_SECRET,
             { expiresIn: '8h' }
@@ -52,8 +41,8 @@ router.post('/login/student', async (req, res) => {
                 id: student.id,
                 email: student.email,
                 name: student.full_name,
-                studentId: student.student_id,
-                grade: student.grade
+                grade: student.grade,
+                totalHours: student.total_hours
             }
         });
 
@@ -63,6 +52,52 @@ router.post('/login/student', async (req, res) => {
     }
 });
 
+// Teacher Login
+router.post('/login/teacher', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        console.log('Teacher login attempt:', email);
+
+        const result = await db.query(
+            'SELECT * FROM users WHERE email = $1 AND user_type = $2',
+            [email.toLowerCase(), 'teacher']
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const teacher = result.rows[0];
+        const validPassword = await bcrypt.compare(password, teacher.password_hash);
+
+        if (!validPassword) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign(
+            { 
+                id: teacher.id, 
+                type: 'teacher',
+                email: teacher.email 
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '8h' }
+        );
+        
+        res.json({
+            token,
+            user: {
+                id: teacher.id,
+                email: teacher.email,
+                name: teacher.full_name
+            }
+        });
+
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 router.post('/verify/organization', async (req, res) => {
     try {
@@ -110,51 +145,4 @@ router.post('/verify/organization', async (req, res) => {
     }
 });    
  
-
-router.post('/login/teacher', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        console.log('Login attempt:', email);
-
-        const result = await db.query(
-            'SELECT * FROM users WHERE email = $1 AND user_type = $2',
-            [email.toLowerCase(), 'teacher']
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-
-        const teacher = result.rows[0];
-        const validPassword = await bcrypt.compare(password, teacher.password_hash);
-
-        if (!validPassword) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-
-        const token = jwt.sign(
-            { 
-                id: teacher.id, 
-                type: 'teacher',
-                email: teacher.email 
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '8h' }
-        );
-        
-        res.json({
-            token,
-            user: {
-                id: teacher.id,
-                email: teacher.email,
-                name: teacher.full_name
-            }
-        });
-
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
 module.exports = router;
