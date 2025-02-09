@@ -72,6 +72,36 @@ router.post('/login/student', async (req, res) => {
     }
 });
 
+// Add this new route temporarily for testing
+router.post('/test-password', async (req, res) => {
+    try {
+        const testPassword = 'test123';
+        // Generate a new hash
+        const hash = await bcrypt.hash(testPassword, 10);
+        console.log('Generated hash:', hash);
+        
+        // Test the comparison immediately
+        const testCompare = await bcrypt.compare(testPassword, hash);
+        console.log('Test comparison result:', testCompare);
+        
+        // Update the database with this new hash
+        await db.query(
+            'UPDATE users SET password_hash = $1 WHERE email = $2',
+            [hash, 'student1@curro.co.za']
+        );
+        
+        res.json({ 
+            message: 'Password updated', 
+            hash: hash,
+            testCompare: testCompare 
+        });
+    } catch (error) {
+        console.error('Test password error:', error);
+        res.status(500).json({ message: 'Error in test password route' });
+    }
+});
+
+
 // Teacher Login
 router.post('/login/teacher', async (req, res) => {
     try {
