@@ -7,19 +7,22 @@ const db = require('../config/db');
 
 router.post('/login/student', async (req, res) => {
     try {
-        console.log('Received request body:', req.body); // Add logging
-        const { email, password } = req.body;  // Changed from studentId to email
+        console.log('Raw request body:', req.body);
+        console.log('Headers:', req.headers);
+
+        if (!req.body) {
+            return res.status(400).json({ message: 'Request body is missing' });
+        }
+
+        const { email, password } = req.body;
         
-        if (!email || !password) {
-            return res.status(400).json({ 
-                message: 'Email and password are required',
-                received: { email: !!email, password: !!password }
-            });
+        if (!email) {
+            return res.status(400).json({ message: 'Email is required', receivedBody: req.body });
         }
 
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1 AND user_type = $2',
-            [email.toLowerCase(), 'student']  // Changed from studentId to email
+            [email.toLowerCase(), 'student']
         );
 
         if (result.rows.length === 0) {
@@ -56,7 +59,7 @@ router.post('/login/student', async (req, res) => {
 
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error', details: error.message });
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
