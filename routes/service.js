@@ -5,6 +5,9 @@ const authMiddleware = require('../middleware/auth');
 // Student details route
 router.get('/student-details/:studentId', authMiddleware.verifyToken, async (req, res) => {
     try {
+        console.log('Fetching details for student ID:', req.params.studentId);
+        console.log('User from token:', req.user);
+
         // First get student information
         const studentInfo = await db.query(
             `SELECT id, full_name, grade, total_hours 
@@ -12,6 +15,7 @@ router.get('/student-details/:studentId', authMiddleware.verifyToken, async (req
              WHERE id = $1 AND user_type = 'student'`,
             [req.params.studentId]
         );
+        console.log('Student info query result:', studentInfo.rows);
 
         if (studentInfo.rows.length === 0) {
             return res.status(404).json({ message: 'Student not found' });
