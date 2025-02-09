@@ -3,12 +3,11 @@ const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 
 // Student details route
-// In routes/service.js, update the student-details endpoint
-router.get('/student-details/:studentId', async (req, res) => {
+router.get('/student-details/:studentId', authMiddleware.verifyToken, async (req, res) => {
     try {
         // First get student information
         const studentInfo = await db.query(
-            `SELECT id, full_name, student_id, grade, total_hours 
+            `SELECT id, full_name, grade, total_hours 
              FROM users 
              WHERE id = $1 AND user_type = 'student'`,
             [req.params.studentId]
@@ -17,17 +16,6 @@ router.get('/student-details/:studentId', async (req, res) => {
         if (studentInfo.rows.length === 0) {
             return res.status(404).json({ message: 'Student not found' });
         }
-
-        const hoursQuery = await db.query(
-            `SELECT 
-                SUM(CASE WHEN service_type = 'school' THEN hours ELSE 0 END) as school_hours,
-                SUM(CASE WHEN service_type = 'community' THEN hours ELSE 0 END) as community_hours,
-                SUM(hours) as total_hours
-             FROM service_records 
-             WHERE student_id = $1`,
-            [req.params.studentId]
-        );
-
 
         const serviceRecords = await db.query(
             `SELECT 
@@ -43,7 +31,7 @@ router.get('/student-details/:studentId', async (req, res) => {
              FROM service_records sr
              LEFT JOIN users u ON sr.assigned_by = u.id
              LEFT JOIN organizations o ON sr.organization_id = o.id
-             WHERE sr.student_id = $1
+             WHERE sr.user_id = $1  -- Changed from student_id to user_id
              ORDER BY sr.date_completed DESC`,
             [req.params.studentId]
         );
@@ -71,12 +59,13 @@ router.get('/student-details/:studentId', async (req, res) => {
     }
 });
 
+// Log community service route
 router.post('/log-community', authMiddleware.verifyToken, async (req, res) => {
     try {
         const { studentName, hours, dateCompleted, description } = req.body;
         const organizationId = req.user.id;
 
-        // Find student
+        // Find student by name
         const studentResult = await db.query(
             'SELECT id FROM users WHERE full_name = $1 AND user_type = $2',
             [studentName, 'student']
@@ -89,7 +78,7 @@ router.post('/log-community', authMiddleware.verifyToken, async (req, res) => {
         // Insert service record
         const insertResult = await db.query(
             `INSERT INTO service_records (
-                student_id,
+                user_id,  -- Changed from student_id
                 hours,
                 service_type,
                 description,
@@ -124,7 +113,6 @@ router.post('/log-community', authMiddleware.verifyToken, async (req, res) => {
     }
 });
 
-
 // Search students route
 router.get('/search-students', async (req, res) => {
     try {
@@ -132,11 +120,10 @@ router.get('/search-students', async (req, res) => {
         console.log('Searching for:', query);
 
         const result = await db.query(
-            `SELECT id, full_name, student_id, grade, total_hours 
+            `SELECT id, full_name, grade, total_hours 
              FROM users 
              WHERE user_type = 'student' 
-             AND (LOWER(full_name) LIKE LOWER($1) 
-                  OR LOWER(student_id) LIKE LOWER($1))`,
+             AND LOWER(full_name) LIKE LOWER($1)`,  // Removed student_id from search
             [`%${query}%`]
         );
 
@@ -166,7 +153,7 @@ router.post('/log', authMiddleware.verifyToken, async (req, res) => {
 
         const insertResult = await db.query(
             `INSERT INTO service_records (
-                student_id,
+                user_id,  -- Changed from student_id
                 hours,
                 service_type,
                 description,
