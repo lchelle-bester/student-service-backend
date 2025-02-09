@@ -2,8 +2,17 @@ const router = require('express').Router();
 const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 
+router.use((req, res, next) => {
+    console.log('Service Route accessed:', req.method, req.path);
+    console.log('Headers:', req.headers);
+    next();
+});
+
+
 // Student details route
 router.get('/student-details/:studentId', authMiddleware.verifyToken, async (req, res) => {
+    console.log('Accessing student details with ID:', req.params.studentId);
+
     try {
         console.log('Fetching details for student ID:', req.params.studentId);
         console.log('User from token:', req.user);
