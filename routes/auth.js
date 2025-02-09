@@ -7,23 +7,35 @@ const db = require('../config/db');
 router.post('/login/student', async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log('Attempting student login for:', email);
+        console.log('Login attempt received:', { email, password });
 
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1 AND user_type = $2',
             [email.toLowerCase(), 'student']
         );
+        console.log('Database query result count:', result.rows.length);
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            console.log('No user found with email:', email);
+            return res.status(401).json({ message: 'Invalid credentials (user not found)' });
         }
 
         const student = result.rows[0];
+        console.log('Found user:', {
+            id: student.id,
+            email: student.email,
+            hasPasswordHash: !!student.password_hash
+        });
+
         const validPassword = await bcrypt.compare(password, student.password_hash);
+        console.log('Password validation result:', validPassword);
 
         if (!validPassword) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            console.log('Password validation failed');
+            return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
         }
+
+        // ... rest of the code remains the same
 
         const token = jwt.sign(
             { 
