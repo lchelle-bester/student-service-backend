@@ -43,7 +43,6 @@ router.post('/login/student', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
         }
 
-        // ... rest of the code remains the same
 
         const token = jwt.sign(
             { 
@@ -54,6 +53,8 @@ router.post('/login/student', async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '8h' }
         );
+        
+        console.log('Generated token payload:', { id: student.id, type: 'student', email: student.email });
 
         res.json({
             token,
@@ -106,22 +107,30 @@ router.post('/test-password', async (req, res) => {
 router.post('/login/teacher', async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log('Teacher login attempt:', email);
+        console.log('Teacher login attempt:', { email, hasPassword: !!password });
 
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1 AND user_type = $2',
             [email.toLowerCase(), 'teacher']
         );
+        console.log('Database query result:', { found: result.rows.length > 0 });
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({ message: 'Invalid credentials (user not found)' });
         }
 
         const teacher = result.rows[0];
+        console.log('Found teacher:', { 
+            id: teacher.id, 
+            email: teacher.email,
+            hasPasswordHash: !!teacher.password_hash
+        });
+
         const validPassword = await bcrypt.compare(password, teacher.password_hash);
+        console.log('Password validation result:', validPassword);
 
         if (!validPassword) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
         }
 
         const token = jwt.sign(
