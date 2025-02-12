@@ -107,27 +107,34 @@ router.post('/test-password', async (req, res) => {
 router.post('/login/teacher', async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log('Teacher login attempt:', { email, hasPassword: !!password });
+        console.log('Teacher login attempt with:', { 
+            email, 
+            providedPassword: password 
+        });
 
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1 AND user_type = $2',
             [email.toLowerCase(), 'teacher']
         );
-        console.log('Database query result:', { found: result.rows.length > 0 });
+        console.log('Query result:', {
+            userFound: result.rows.length > 0,
+            storedHash: result.rows[0]?.password_hash
+        });
 
         if (result.rows.length === 0) {
             return res.status(401).json({ message: 'Invalid credentials (user not found)' });
         }
 
         const teacher = result.rows[0];
-        console.log('Found teacher:', { 
-            id: teacher.id, 
-            email: teacher.email,
-            hasPasswordHash: !!teacher.password_hash
+        
+        // Test the password comparison
+        console.log('Attempting password comparison:', {
+            passwordProvided: password,
+            storedHash: teacher.password_hash
         });
 
         const validPassword = await bcrypt.compare(password, teacher.password_hash);
-        console.log('Password validation result:', validPassword);
+        console.log('Password comparison result:', validPassword);
 
         if (!validPassword) {
             return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
