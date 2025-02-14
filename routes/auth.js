@@ -209,7 +209,7 @@ router.post('/verify/organization', async (req, res) => {
             message: 'Server error during verification' 
         });
     }
-});  
+});
 
 
 router.post('/generate-test-hash', async (req, res) => {
