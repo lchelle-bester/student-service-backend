@@ -2,6 +2,158 @@ const router = require('express').Router();
 const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 
+// Add this validation function at the top of the file
+const validateServiceHours = (hours, dateCompleted, studentName) => {
+    const errors = [];
+    
+    // Check if all fields are present
+    if (!hours || !dateCompleted || !studentName) {
+        errors.push('All fields are required');
+    }
+
+    // Validate date (must be in the past)
+    const selectedDate = new Date(dateCompleted);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
+    
+    if (selectedDate > today) {
+        errors.push('Service date cannot be in the future');
+    }
+
+    // Validate hours (must be between 0 and 10)
+    if (hours <= 0 || hours > 10) {
+        errors.push('Hours must be between 1 and 10');
+    }
+
+    return errors;
+};
+
+// Update both service logging routes
+router.post('/log', authMiddleware.verifyToken, async (req, res) => {
+    try {
+        const { studentName, numberOfHours, dateCompleted, description } = req.body;
+        const teacherId = req.user.id;
+
+        // Validate the input
+        const validationErrors = validateServiceHours(numberOfHours, dateCompleted, studentName);
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: validationErrors.join(', ') 
+            });
+        }
+
+        // Find student (case-insensitive)
+        const studentResult = await db.query(
+            'SELECT id FROM users WHERE LOWER(full_name) = LOWER($1) AND user_type = $2',
+            [studentName, 'student']
+        );
+
+        if (studentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        const insertResult = await db.query(
+            `INSERT INTO service_records (
+                user_id,
+                hours,
+                service_type,
+                description,
+                date_completed,
+                assigned_by
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id`,
+            [
+                studentResult.rows[0].id,
+                numberOfHours,
+                'school',
+                description,
+                dateCompleted,
+                teacherId
+            ]
+        );
+
+        await db.query(
+            'UPDATE users SET total_hours = total_hours + $1 WHERE id = $2',
+            [numberOfHours, studentResult.rows[0].id]
+        );
+
+        res.json({ 
+            success: true, 
+            message: 'Service hours logged successfully',
+            recordId: insertResult.rows[0].id
+        });
+
+    } catch (error) {
+        console.error('Error logging service hours:', error);
+        res.status(500).json({ message: 'Failed to log service hours' });
+    }
+});
+
+// Similarly update the organization logging route
+router.post('/log-community', authMiddleware.verifyToken, async (req, res) => {
+    try {
+        const { studentName, hours, dateCompleted, description } = req.body;
+        const organizationId = req.user.id;
+
+        // Validate the input
+        const validationErrors = validateServiceHours(hours, dateCompleted, studentName);
+        if (validationErrors.length > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: validationErrors.join(', ') 
+            });
+        }
+
+        // Find student (case-insensitive)
+        const studentResult = await db.query(
+            'SELECT id FROM users WHERE LOWER(full_name) = LOWER($1) AND user_type = $2',
+            [studentName, 'student']
+        );
+
+        if (studentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        const insertResult = await db.query(
+            `INSERT INTO service_records (
+                user_id,
+                hours,
+                service_type,
+                description,
+                date_completed,
+                organization_id
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id`,
+            [
+                studentResult.rows[0].id,
+                hours,
+                'community',
+                description,
+                dateCompleted,
+                organizationId
+            ]
+        );
+
+        await db.query(
+            'UPDATE users SET total_hours = total_hours + $1 WHERE id = $2',
+            [hours, studentResult.rows[0].id]
+        );
+
+        res.json({ 
+            success: true, 
+            message: 'Community service hours logged successfully',
+            recordId: insertResult.rows[0].id
+        });
+
+    } catch (error) {
+        console.error('Error logging community service hours:', error);
+        res.status(500).json({ message: 'Failed to log service hours' });
+    }
+});
+
+
+
 router.use((req, res, next) => {
     console.log('Service Route accessed:', req.method, req.path);
     console.log('Headers:', req.headers);
