@@ -7,66 +7,42 @@ const db = require('../config/db');
 router.post('/login/student', async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log('Received login attempt for:', email);
+        console.log('Login attempt received:', { email, passwordLength: password?.length });
 
         const result = await db.query(
-            'SELECT * FROM users WHERE email = $1 AND user_type = $2',
-            [email.toLowerCase(), 'student']
+            'SELECT * FROM users WHERE LOWER(email) = LOWER($1) AND user_type = $2',
+            [email, 'student']
         );
+        console.log('Database query result:', { 
+            found: result.rows.length > 0,
+            userEmail: result.rows[0]?.email
+        });
 
         if (result.rows.length === 0) {
             return res.status(401).json({ message: 'Invalid credentials (user not found)' });
         }
 
         const student = result.rows[0];
-        console.log('Stored password hash:', student.password_hash);
-        console.log('Attempting to compare with password:', password);
-
-        // Let's also test bcrypt directly
-        const testHash = await bcrypt.hash('password123', 10);
-        console.log('Test hash generated:', testHash);
-        const testCompare = await bcrypt.compare('password123', testHash);
-        console.log('Test comparison result:', testCompare);
-
-        // Now try the actual comparison
-        const validPassword = await bcrypt.compare(password, student.password_hash);
-        console.log('Actual comparison result:', validPassword);
-
-        if (!validPassword) {
-            return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
-        }
-
-        // ... rest of the code
-
-        if (!validPassword) {
-            console.log('Password validation failed');
-            return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
-        }
-
-
-        const token = jwt.sign(
-            { 
-                id: student.id, 
-                type: 'student',
-                email: student.email 
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '8h' }
-        );
-        
-        console.log('Generated token payload:', { id: student.id, type: 'student', email: student.email });
-
-        res.json({
-            token,
-            user: {
-                id: student.id,
-                email: student.email,
-                name: student.full_name,
-                grade: student.grade,
-                totalHours: student.total_hours
-            }
+        console.log('Found student:', {
+            id: student.id,
+            email: student.email,
+            hasPasswordHash: !!student.password_hash,
+            hashLength: student.password_hash?.length
         });
 
+        try {
+            const validPassword = await bcrypt.compare(password, student.password_hash);
+            console.log('Password validation result:', validPassword);
+            
+            if (!validPassword) {
+                return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
+            }
+        } catch (bcryptError) {
+            console.error('Bcrypt comparison error:', bcryptError);
+            return res.status(500).json({ message: 'Error validating password' });
+        }
+
+        // Rest of your code...
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ message: 'Server error' });
