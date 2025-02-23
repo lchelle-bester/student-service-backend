@@ -21,8 +21,13 @@ const validateServiceHours = (hours, dateCompleted, studentName) => {
     }
 
     // Validate hours (must be between 0 and 10)
-    if (hours <= 0 || hours > 10) {
-        errors.push('Hours must be between 1 and 10');
+    const hoursNum = parseFloat(hours);
+    if (isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 10) {
+        errors.push('Hours must be between 0.5 and 10');
+    }
+
+    if (hoursNum * 10 % 5 !== 0) {
+        errors.push('Hours must be in half hour increments');
     }
 
     return errors;
