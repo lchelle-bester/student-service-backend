@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
+//invalid
+
 // Student Login
 router.post('/login/student', async (req, res) => {
     try {
@@ -195,6 +197,7 @@ router.post('/verify/organization', async (req, res) => {
 
         res.json({
             success: true,
+            message: null,
             token,
             organization: {
                 name: organization.name,
