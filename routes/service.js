@@ -2,10 +2,10 @@ const router = require('express').Router();
 const db = require('../config/db');
 const authMiddleware = require('../middleware/auth');
 
-const validateServiceHours = (hours, dateCompleted, studentName) => {
+const validateServiceHours = (hours, dateCompleted, studentName, description) => {
     const errors = [];
     
-    if (!hours || !dateCompleted || !studentName) {
+    if (!hours || !dateCompleted || !studentName ||!description) {
         errors.push('All fields are required');
     }
 
@@ -27,6 +27,11 @@ const validateServiceHours = (hours, dateCompleted, studentName) => {
     if (Math.round(hoursNum * 10) % 5 !== 0) {
         errors.push('Hours must be in half hour increments (0.5)');
     }
+
+    if(description.length < 8){
+        errors.push('Description must be at least 8 characters long');
+    }
+
 
     return errors;
 };
@@ -138,7 +143,7 @@ router.post('/log-community', authMiddleware.verifyToken, async (req, res) => {
 
         res.json({ 
             success: true, 
-            message: 'Community service hours logged successfully',
+            message: 'Community service hours logged successfully!',
             recordId: insertResult.rows[0].id,
             hoursLogged: hoursFloat
         });
