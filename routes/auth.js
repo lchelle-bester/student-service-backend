@@ -215,22 +215,5 @@ router.post('/verify/organization', async (req, res) => {
 });
 
 
-router.post('/generate-test-hash', async (req, res) => {
-    try {
-        const password = 'test123';
-        const hash = await bcrypt.hash(password, 10);
-        console.log('Generated hash:', hash);
-        
-        await db.query(
-            'UPDATE users SET password_hash = $1 WHERE email = $2',
-            [hash, 'teacher1@curro.co.za']
-        );
-        
-        res.json({ message: 'Hash generated and updated' });
-    } catch (error) {
-        console.error('Hash generation error:', error);
-        res.status(500).json({ message: 'Error generating hash' });
-    }
-});
- 
+
 module.exports = router;
