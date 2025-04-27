@@ -99,7 +99,7 @@ router.post('/log-community', authMiddleware.verifyToken, async (req, res) => {
         
         const organizationId = req.user.id;
 
-        const validationErrors = validateServiceHours(hoursFloat, dateCompleted, studentName);
+        const validationErrors = validateServiceHours(hoursFloat, dateCompleted, studentName, description);
         if (validationErrors.length > 0) {
             return res.status(400).json({ 
                 success: false, 
@@ -180,7 +180,7 @@ router.post('/log', authMiddleware.verifyToken, async (req, res) => {
         const hoursFloat = parseFloat(numberOfHours);
         const teacherId = req.user.id;
 
-        const validationErrors = validateServiceHours(hoursFloat, dateCompleted, studentName);
+        const validationErrors = validateServiceHours(hoursFloat, dateCompleted, studentName, description);
         if (validationErrors.length > 0) {
             return res.status(400).json({ 
                 success: false, 
