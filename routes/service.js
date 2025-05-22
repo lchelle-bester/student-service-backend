@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db = require('../config/db');
+
 const authMiddleware = require('../middleware/auth');
 
 const validateServiceHours = (hours, dateCompleted, studentName, description) => {
@@ -46,7 +47,7 @@ router.get('/student-details/:studentId', authMiddleware.verifyToken, async (req
         );
 
         if (studentInfo.rows.length === 0) {
-            return res.status(404).json({ message: 'Student not found' });
+            return res.status(404).json({ message: 'Student not found, please check your spelling of their name.' });
         }
 
         const serviceRecords = await db.query(
