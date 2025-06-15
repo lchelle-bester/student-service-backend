@@ -3,6 +3,301 @@ const db = require('../config/db');
 
 const authMiddleware = require('../middleware/auth');
 
+
+// Add these routes to your existing routes/service.js file
+
+// Batch logging for teachers (school service)
+router.post('/batch-log', authMiddleware.verifyToken, async (req, res) => {
+    const client = await db.pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        const { 
+            students,           // Array of student objects [{firstName, surname, hours}, ...]
+            dateCompleted, 
+            description 
+        } = req.body;
+        
+        const teacherId = req.user.id;
+        
+        // Validate common fields
+        if (!dateCompleted || !description || !students || students.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Missing required fields' 
+            });
+        }
+        
+        if (description.length < 8 || description.length > 200) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Description must be between 8 and 200 characters' 
+            });
+        }
+        
+        const results = [];
+        const errors = [];
+        
+        // Process each student
+        for (let i = 0; i < students.length; i++) {
+            const student = students[i];
+            const { firstName, surname, hours } = student;
+            
+            try {
+                // Validate student data
+                const hoursFloat = parseFloat(hours);
+                if (isNaN(hoursFloat) || hoursFloat < 0.5 || hoursFloat > 10) {
+                    errors.push(`Student ${i + 1}: Hours must be between 0.5 and 10`);
+                    continue;
+                }
+                
+                if ((hoursFloat * 10) % 5 !== 0) {
+                    errors.push(`Student ${i + 1}: Hours must be in half hour increments`);
+                    continue;
+                }
+                
+                if (!firstName || firstName.trim().length <= 1) {
+                    errors.push(`Student ${i + 1}: First name must be longer than 1 character`);
+                    continue;
+                }
+                
+                if (!surname || surname.trim().length <= 1) {
+                    errors.push(`Student ${i + 1}: Surname must be longer than 1 character`);
+                    continue;
+                }
+                
+                const fullName = `${firstName.trim()} ${surname.trim()}`;
+                
+                // Find student in database
+                const studentResult = await client.query(
+                    'SELECT id FROM users WHERE LOWER(full_name) = LOWER($1) AND user_type = $2',
+                    [fullName, 'student']
+                );
+                
+                if (studentResult.rows.length === 0) {
+                    errors.push(`Student ${i + 1}: ${fullName} not found in database`);
+                    continue;
+                }
+                
+                // Insert service record
+                const insertResult = await client.query(
+                    `INSERT INTO service_records (
+                        user_id,
+                        hours,
+                        service_type,
+                        description,
+                        date_completed,
+                        assigned_by
+                    ) VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING id, hours`,
+                    [
+                        studentResult.rows[0].id,
+                        hoursFloat,
+                        'school',
+                        description,
+                        dateCompleted,
+                        teacherId
+                    ]
+                );
+                
+                // Update student's total hours
+                await client.query(
+                    'UPDATE users SET total_hours = total_hours + $1 WHERE id = $2',
+                    [hoursFloat, studentResult.rows[0].id]
+                );
+                
+                results.push({
+                    studentName: fullName,
+                    hours: hoursFloat,
+                    recordId: insertResult.rows[0].id,
+                    success: true
+                });
+                
+            } catch (studentError) {
+                console.error(`Error processing student ${i + 1}:`, studentError);
+                errors.push(`Student ${i + 1}: ${studentError.message}`);
+            }
+        }
+        
+        await client.query('COMMIT');
+        
+        // Prepare response
+        const response = {
+            success: results.length > 0,
+            message: `Successfully logged ${results.length} student(s)`,
+            results: results,
+            totalStudents: students.length,
+            successCount: results.length,
+            errorCount: errors.length
+        };
+        
+        if (errors.length > 0) {
+            response.errors = errors;
+            response.message += `, ${errors.length} error(s) occurred`;
+        }
+        
+        res.json(response);
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Batch logging error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to process batch logging',
+            error: error.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
+// Batch logging for organizations (community service)
+router.post('/batch-log-community', authMiddleware.verifyToken, async (req, res) => {
+    const client = await db.pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        const { 
+            students,           // Array of student objects [{firstName, surname, hours}, ...]
+            dateCompleted, 
+            description 
+        } = req.body;
+        
+        const organizationId = req.user.id;
+        
+        // Validate common fields
+        if (!dateCompleted || !description || !students || students.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Missing required fields' 
+            });
+        }
+        
+        if (description.length < 8 || description.length > 200) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Description must be between 8 and 200 characters' 
+            });
+        }
+        
+        const results = [];
+        const errors = [];
+        
+        // Process each student
+        for (let i = 0; i < students.length; i++) {
+            const student = students[i];
+            const { firstName, surname, hours } = student;
+            
+            try {
+                // Validate student data
+                const hoursFloat = parseFloat(hours);
+                if (isNaN(hoursFloat) || hoursFloat < 0.5 || hoursFloat > 10) {
+                    errors.push(`Student ${i + 1}: Hours must be between 0.5 and 10`);
+                    continue;
+                }
+                
+                if ((hoursFloat * 10) % 5 !== 0) {
+                    errors.push(`Student ${i + 1}: Hours must be in half hour increments`);
+                    continue;
+                }
+                
+                if (!firstName || firstName.trim().length <= 1) {
+                    errors.push(`Student ${i + 1}: First name must be longer than 1 character`);
+                    continue;
+                }
+                
+                if (!surname || surname.trim().length <= 1) {
+                    errors.push(`Student ${i + 1}: Surname must be longer than 1 character`);
+                    continue;
+                }
+                
+                const fullName = `${firstName.trim()} ${surname.trim()}`;
+                
+                // Find student in database
+                const studentResult = await client.query(
+                    'SELECT id FROM users WHERE LOWER(full_name) = LOWER($1) AND user_type = $2',
+                    [fullName, 'student']
+                );
+                
+                if (studentResult.rows.length === 0) {
+                    errors.push(`Student ${i + 1}: ${fullName} not found in database`);
+                    continue;
+                }
+                
+                // Insert service record
+                const insertResult = await client.query(
+                    `INSERT INTO service_records (
+                        user_id,
+                        hours,
+                        service_type,
+                        description,
+                        date_completed,
+                        organization_id
+                    ) VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING id, hours`,
+                    [
+                        studentResult.rows[0].id,
+                        hoursFloat,
+                        'community',
+                        description,
+                        dateCompleted,
+                        organizationId
+                    ]
+                );
+                
+                // Update student's total hours
+                await client.query(
+                    'UPDATE users SET total_hours = total_hours + $1 WHERE id = $2',
+                    [hoursFloat, studentResult.rows[0].id]
+                );
+                
+                results.push({
+                    studentName: fullName,
+                    hours: hoursFloat,
+                    recordId: insertResult.rows[0].id,
+                    success: true
+                });
+                
+            } catch (studentError) {
+                console.error(`Error processing student ${i + 1}:`, studentError);
+                errors.push(`Student ${i + 1}: ${studentError.message}`);
+            }
+        }
+        
+        await client.query('COMMIT');
+        
+        // Prepare response
+        const response = {
+            success: results.length > 0,
+            message: `Successfully logged ${results.length} student(s)`,
+            results: results,
+            totalStudents: students.length,
+            successCount: results.length,
+            errorCount: errors.length
+        };
+        
+        if (errors.length > 0) {
+            response.errors = errors;
+            response.message += `, ${errors.length} error(s) occurred`;
+        }
+        
+        res.json(response);
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Batch community logging error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to process batch community logging',
+            error: error.message
+        });
+    } finally {
+        client.release();
+    }
+});
+
 const validateServiceHours = (hours, dateCompleted, studentName, description) => {
     const errors = [];
     
