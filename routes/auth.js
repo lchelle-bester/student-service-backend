@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
-//invalid
+//JWT_SECRET
 
 // Student Login
 router.post('/login/student', async (req, res) => {
