@@ -2,7 +2,7 @@ const express = require('express');
 const authRoutes = require('./routes/auth');
 const serviceRoutes = require('./routes/service');
 const cors = require('cors');
-
+const feedbackRoutes = require('./routes/feedback');
 const app = express();
 
 // Enhanced CORS configuration
@@ -23,6 +23,7 @@ app.options('*', cors());
 
 // Middleware
 app.use(express.json());
+app.use('/api/feedback', feedbackRoutes);
 
 // Routes
 app.use('/api/auth', authRoutes);
