@@ -8,9 +8,14 @@ const app = express();
 // Enhanced CORS configuration
 app.use(cors({
   origin: [
+    // NEW: Your custom domains
+    'https://studentservicediary.co.za',
+    'https://www.studentservicediary.co.za',
+    
+    // OLD: Keep these for now (in case you need them)
     'https://student-service-frontend.vercel.app',
-    'https://student-service-frontend-6tftdbzqi-shellys-projects-f0df4ef5.vercel.app', // Your preview domain
-    /^https:\/\/student-service-frontend.*\.vercel\.app$/, // Pattern to match all Vercel preview domains
+    'https://student-service-frontend-6tftdbzqi-shellys-projects-f0df4ef5.vercel.app',
+    /^https:\/\/student-service-frontend.*\.vercel\.app$/,
     'http://localhost:3000'  // For local development
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
