@@ -173,6 +173,14 @@ router.post(
 
       const organizationId = req.user.id;
 
+      // Get organization key to determine hour limits
+      const orgResult = await client.query(
+        'SELECT org_key FROM organizations WHERE id = $1',
+        [organizationId]
+      );
+      
+      const maxHours = orgResult.rows[0]?.org_key === 'HEO77' ? 50 : 10;
+
       // Validate common fields
       if (
         !dateCompleted ||
@@ -202,10 +210,10 @@ router.post(
         const { firstName, surname, hours } = student;
 
         try {
-          // Validate student data
+          // Validate student data with dynamic max hours
           const hoursFloat = parseFloat(hours);
-          if (isNaN(hoursFloat) || hoursFloat < 0.5 || hoursFloat > 10) {
-            errors.push(`Student ${i + 1}: Hours must be between 0.5 and 10`);
+          if (isNaN(hoursFloat) || hoursFloat < 0.5 || hoursFloat > maxHours) {
+            errors.push(`Student ${i + 1}: Hours must be between 0.5 and ${maxHours}`);
             continue;
           }
 
@@ -314,11 +322,13 @@ router.post(
   }
 );
 
+// Updated validation function to accept maxHours parameter
 const validateServiceHours = (
   hours,
   dateCompleted,
   studentName,
-  description
+  description,
+  maxHours = 10
 ) => {
   const errors = [];
 
@@ -337,8 +347,8 @@ const validateServiceHours = (
   const hoursNum = parseFloat(hours);
   console.log("Validating hours:", { original: hours, parsed: hoursNum });
 
-  if (isNaN(hoursNum) || hoursNum <= 0 || hoursNum > 10) {
-    errors.push("Hours must be between 0.5 and 10");
+  if (isNaN(hoursNum) || hoursNum <= 0 || hoursNum > maxHours) {
+    errors.push(`Hours must be between 0.5 and ${maxHours}`);
   }
 
   if (Math.round(hoursNum * 10) % 5 !== 0) {
@@ -421,11 +431,20 @@ router.post("/log-community", authMiddleware.verifyToken, async (req, res) => {
 
     const organizationId = req.user.id;
 
+    // Get organization key to determine hour limits
+    const orgResult = await db.query(
+      'SELECT org_key FROM organizations WHERE id = $1',
+      [organizationId]
+    );
+    
+    const maxHours = orgResult.rows[0]?.org_key === 'HEO77' ? 50 : 10;
+
     const validationErrors = validateServiceHours(
       hoursFloat,
       dateCompleted,
       studentName,
-      description
+      description,
+      maxHours
     );
     if (validationErrors.length > 0) {
       return res.status(400).json({
