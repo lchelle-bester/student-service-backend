@@ -4,10 +4,17 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
 // Student Login
+// Student Login - Email Only (No Password Required)
 router.post('/login/student', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        console.log('Received login attempt for:', email);
+        const { email } = req.body;  // Remove password destructuring
+        console.log('Received student login attempt for:', email);
+
+        if (!email) {
+            return res.status(400).json({ 
+                message: 'Email is required' 
+            });
+        }
 
         const result = await db.query(
             'SELECT * FROM users WHERE email = $1 AND user_type = $2',
@@ -15,34 +22,13 @@ router.post('/login/student', async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ message: 'Invalid credentials (user not found)' });
+            return res.status(401).json({ 
+                message: 'Email not found. Please check spelling and try again or contact support at lchelle@studentservicediary.co.za' 
+            });
         }
 
         const student = result.rows[0];
-        console.log('Stored password hash:', student.password_hash);
-        console.log('Attempting to compare with password:', password);
-
-        // Let's also test bcrypt directly
-        const testHash = await bcrypt.hash('password123', 10);
-        console.log('Test hash generated:', testHash);
-        const testCompare = await bcrypt.compare('password123', testHash);
-        console.log('Test comparison result:', testCompare);
-
-        // Now try the actual comparison
-        const validPassword = await bcrypt.compare(password, student.password_hash);
-        console.log('Actual comparison result:', validPassword);
-
-        if (!validPassword) {
-            return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
-        }
-
-        // ... rest of the code
-
-        if (!validPassword) {
-            console.log('Password validation failed');
-            return res.status(401).json({ message: 'Invalid credentials (invalid password)' });
-        }
-
+        console.log('Student found:', student.email);
 
         const token = jwt.sign(
             { 
@@ -63,12 +49,13 @@ router.post('/login/student', async (req, res) => {
                 email: student.email,
                 name: student.full_name,
                 grade: student.grade,
-                totalHours: student.total_hours
+                totalHours: student.total_hours || 0,
+                student_id: student.student_id
             }
         });
 
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Student login error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
