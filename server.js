@@ -107,4 +107,20 @@ app.listen(PORT, () => {
   console.log('CORS enabled for origins:', corsOptions.origin);
 });
 
+
+// Add this AFTER your existing routes in server.js
+app.all('/api/test-cors', (req, res) => {
+  console.log('Test route hit:', req.method);
+  
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  res.json({ message: 'CORS test works!' });
+});
+
 module.exports = app;
