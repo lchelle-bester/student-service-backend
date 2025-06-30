@@ -3,8 +3,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
-//JWT_SECRET
-
 // Student Login
 router.post('/login/student', async (req, res) => {
     try {
