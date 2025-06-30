@@ -3,7 +3,14 @@ const authRoutes = require('./routes/auth');
 const serviceRoutes = require('./routes/service');
 const cors = require('cors');
 const feedbackRoutes = require('./routes/feedback');
+
+console.log('authRoutes loaded:', typeof authRoutes);
+console.log('serviceRoutes loaded:', typeof serviceRoutes);
+console.log('feedbackRoutes loaded:', typeof feedbackRoutes);
+
 const app = express();
+
+
 
 // Enhanced CORS configuration
 const corsOptions = {
