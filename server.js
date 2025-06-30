@@ -33,19 +33,38 @@ const corsOptions = {
   optionsSuccessStatus: 200 // For legacy browser support
 };
 
+// EXPLICIT OPTIONS HANDLER - Must come BEFORE other middleware
+app.use((req, res, next) => {
+  // Set CORS headers for all requests
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight OPTIONS requests immediately
+  if (req.method === 'OPTIONS') {
+    console.log('OPTIONS request received for:', req.path);
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 // Apply CORS with explicit options
 app.use(cors(corsOptions));
 
-// Handle preflight requests explicitly
+// Handle preflight requests explicitly (backup)
 app.options('*', cors(corsOptions));
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Add logging middleware to debug CORS
+// Add enhanced logging middleware to debug CORS
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - Origin: ${req.get('Origin')}`);
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Origin:', req.get('Origin'));
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
   next();
 });
 
@@ -59,7 +78,9 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'Service Hours API is running',
     corsOrigins: corsOptions.origin,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    headers: req.headers
   });
 });
 
