@@ -235,69 +235,111 @@ router.post(
   }
 );
 
-// Individual community service logging - UPDATED
+// Individual community service logging - UPDATED with better error handling
 router.post("/log-community", authMiddleware.verifyToken, async (req, res) => {
+  console.log("=== Starting log-community request ===");
+  console.log("Request body:", req.body);
+  console.log("User from token:", req.user);
+
   try {
     const { studentName, hours, dateCompleted, description } = req.body;
-    const hoursFloat = parseFloat(hours);
-    console.log("Processing hours:", { received: hours, parsed: hoursFloat });
-
-    const organizationId = req.user.id;
-    console.log("Organization ID:", organizationId);
-
-    // Get the hour limit for this organization first
-    const maxHours = await getOrganizationHourLimit(organizationId);
-    console.log("Max hours allowed for this org:", maxHours);
-
-    // Simple validation with organization-specific limits
+    
+    // Input validation
     if (!studentName || !hours || !dateCompleted || !description) {
+      console.log("Missing required fields");
       return res.status(400).json({
         success: false,
         message: "All fields are required",
       });
     }
 
-    if (isNaN(hoursFloat) || hoursFloat < 0.5 || hoursFloat > maxHours) {
+    const hoursFloat = parseFloat(hours);
+    const organizationId = req.user.id;
+    
+    console.log("Processing hours:", { received: hours, parsed: hoursFloat });
+    console.log("Organization ID:", organizationId);
+
+    // Basic number validation first
+    if (isNaN(hoursFloat)) {
+      console.log("Hours is not a number");
+      return res.status(400).json({
+        success: false,
+        message: "Hours must be a valid number",
+      });
+    }
+
+    // Get the hour limit for this organization
+    console.log("Getting hour limit for organization...");
+    let maxHours;
+    try {
+      maxHours = await getOrganizationHourLimit(organizationId);
+      console.log("Max hours allowed for this org:", maxHours);
+    } catch (limitError) {
+      console.error("Error getting hour limit:", limitError);
+      maxHours = 10; // Fallback to default
+    }
+
+    // Validate hours against organization limit
+    if (hoursFloat < 0.5 || hoursFloat > maxHours) {
+      console.log(`Hours ${hoursFloat} outside allowed range 0.5-${maxHours}`);
       return res.status(400).json({
         success: false,
         message: `Hours must be between 0.5 and ${maxHours}`,
       });
     }
 
+    // Validate half-hour increments
     if (Math.round(hoursFloat * 10) % 5 !== 0) {
+      console.log("Hours not in half-hour increments");
       return res.status(400).json({
         success: false,
         message: "Hours must be in half hour increments (0.5)",
       });
     }
 
+    // Validate description
     if (description.length < 8 || description.length > 200) {
+      console.log("Description length invalid:", description.length);
       return res.status(400).json({
         success: false,
         message: "Description must be between 8 and 200 characters",
       });
     }
 
+    // Validate date
     const selectedDate = new Date(dateCompleted);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (selectedDate > today) {
+      console.log("Date is in the future");
       return res.status(400).json({
         success: false,
         message: "Service date cannot be in the future",
       });
     }
 
+    console.log("All validations passed, looking up student...");
+
+    // Find student
     const studentResult = await db.query(
       "SELECT id FROM users WHERE LOWER(full_name) = LOWER($1) AND user_type = $2",
       [studentName, "student"]
     );
 
+    console.log("Student query result:", studentResult.rows);
+
     if (studentResult.rows.length === 0) {
+      console.log("Student not found:", studentName);
       return res.status(404).json({ message: "Student not found" });
     }
 
+    const studentId = studentResult.rows[0].id;
+    console.log("Found student ID:", studentId);
+
+    console.log("Inserting service record...");
+
+    // Insert service record
     const insertResult = await db.query(
       `INSERT INTO service_records (
                 user_id,
@@ -309,7 +351,7 @@ router.post("/log-community", authMiddleware.verifyToken, async (req, res) => {
             ) VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id, hours`,
       [
-        studentResult.rows[0].id,
+        studentId,
         hoursFloat,
         "community",
         description,
@@ -318,10 +360,17 @@ router.post("/log-community", authMiddleware.verifyToken, async (req, res) => {
       ]
     );
 
+    console.log("Insert result:", insertResult.rows);
+
+    console.log("Updating student total hours...");
+
+    // Update student's total hours
     await db.query(
       "UPDATE users SET total_hours = total_hours + $1 WHERE id = $2",
-      [hoursFloat, studentResult.rows[0].id]
+      [hoursFloat, studentId]
     );
+
+    console.log("Successfully completed all operations");
 
     res.json({
       success: true,
@@ -329,11 +378,17 @@ router.post("/log-community", authMiddleware.verifyToken, async (req, res) => {
       recordId: insertResult.rows[0].id,
       hoursLogged: hoursFloat,
     });
+
   } catch (error) {
-    console.error("Error logging community service hours:", error);
+    console.error("=== ERROR in log-community ===");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("=== END ERROR ===");
+    
     res.status(500).json({ 
       message: "Failed to log service hours",
-      error: error.message 
+      error: error.message,
+      details: "Check server logs for more information"
     });
   }
 });
